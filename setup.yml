@@ -1,0 +1,21 @@
+---
+- hosts: localhost
+  become: yes
+  tasks:
+    - name: Install Python3 and Pip
+      apt:
+        name:
+          - python3
+          - python3-pip
+        state: present
+
+    - name: Create production folder
+      file:
+        path: /home/lazare/devops_midterm_prod
+        state: directory
+
+    - name: Copy project files
+      copy:
+        src: /mnt/c/Users/User/Desktop/Devops_Midterm/DevopsMidterm
+        dest: /home/lazare/devops_midterm_prod/
+        remote_src: yes
