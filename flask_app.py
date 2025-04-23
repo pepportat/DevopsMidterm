@@ -2,6 +2,10 @@ from flask import Flask, request
 
 app = Flask(__name__)
 
+@app.route('/hello')
+def hello():
+    return 'Hi! from actions'
+
 @app.route('/')
 def home():
     return '''
