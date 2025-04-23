@@ -1,0 +1,20 @@
+from flask import Flask, request
+
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return '''
+        <form action="/greet" method="post">
+            <input name="name">
+            <input type="submit">
+        </form>
+    '''
+
+@app.route('/greet', methods=['POST'])
+def greet():
+    name = request.form.get('name')
+    return f"Hello, {name}!"
+
+if __name__ == "__main__":
+    app.run()
