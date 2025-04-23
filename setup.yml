@@ -58,6 +58,7 @@
         dest: "{{ deploy_path }}/"
         delete: yes
         recursive: yes
+        rsync_path: "rsync"
       delegate_to: localhost
 
     - name: Stop any running Flask app
