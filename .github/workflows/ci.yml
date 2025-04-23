@@ -35,11 +35,3 @@ jobs:
           name: pytest-results
           path: junit/test-results.xml
         if: ${{ always() }}
-
-      - name: Publish test results
-        uses: dorny/test-reporter@v1
-        if: ${{ always() }}
-        with:
-          name: Pytest Results
-          path: junit/test-results.xml
-          reporter: java-junit
