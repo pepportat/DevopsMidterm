@@ -1,21 +1,114 @@
 ---
 - hosts: localhost
   become: yes
+  vars:
+    base_path: /home/lazare
+    blue_path: "{{ base_path }}/blue"
+    green_path: "{{ base_path }}/green"
+    current_path: "{{ base_path }}/current"
+    app_src: /mnt/c/Users/User/Desktop/Devops_Midterm/DevopsMidterm
+    app_port: 5000
+
   tasks:
     - name: Install Python3 and Pip
       apt:
         name:
           - python3
           - python3-pip
+          - curl
         state: present
+        update_cache: yes
 
-    - name: Create production folder
+    - name: Install dependencies from requirements.txt
+      pip:
+        requirements: "{{ app_src }}/requirements.txt"
+        executable: pip3
+
+    - name: Ensure Blue and Green folders exist
       file:
-        path: /home/lazare/devops_midterm_prod
+        path: "{{ item }}"
         state: directory
+        mode: '0755'
+      loop:
+        - "{{ blue_path }}"
+        - "{{ green_path }}"
 
-    - name: Copy project files
-      copy:
-        src: /mnt/c/Users/User/Desktop/Devops_Midterm/DevopsMidterm
-        dest: /home/lazare/devops_midterm_prod/
-        remote_src: yes
+    - name: Determine next environment (blue/green)
+      shell: |
+        if [ -L "{{ current_path }}" ]; then
+          TARGET=$(readlink "{{ current_path }}")
+          if [[ $TARGET == *blue ]]; then
+            echo green
+          else
+            echo blue
+          fi
+        else
+          echo blue
+        fi
+      register: next_env
+      changed_when: false
+
+    - name: Set variable for deploy_path
+      set_fact:
+        deploy_path: "{{ base_path }}/{{ next_env.stdout }}"
+
+    - name: Copy files to {{ deploy_path }}
+      synchronize:
+        src: "{{ app_src }}/"
+        dest: "{{ deploy_path }}/"
+        delete: yes
+        recursive: yes
+      delegate_to: localhost
+
+    - name: Stop any running Flask app
+      shell: pkill -f "python3.*flask_app.py" || true
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Start new Flask app in the background
+      shell: "cd {{ deploy_path }} && nohup python3 flask_app.py > {{ base_path }}/app.log 2>&1 &"
+      async: 1
+      poll: 0
+
+    - name: Wait for application to start
+      wait_for:
+        port: "{{ app_port }}"
+        delay: 2
+        timeout: 10
+
+    - name: Run health check on new deployment
+      shell: "{{ app_src }}/healthcheck.sh"
+      register: healthcheck
+      ignore_errors: yes
+      changed_when: false
+
+    - name: Switch symlink to new version if health check passed
+      file:
+        src: "{{ deploy_path }}"
+        dest: "{{ current_path }}"
+        state: link
+        force: yes
+      when: healthcheck.rc == 0
+
+    - name: Rollback if health check fails
+      block:
+        - name: Stop failed Flask app
+          shell: pkill -f "python3.*flask_app.py" || true
+          ignore_errors: yes
+
+        - name: Start previous version if it exists
+          shell: |
+            if [ -L "{{ current_path }}" ]; then
+              cd "$(readlink {{ current_path }})" && nohup python3 flask_app.py > {{ base_path }}/app.log 2>&1 &
+            fi
+          ignore_errors: yes
+          async: 1
+          poll: 0
+
+        - name: Log failure
+          shell: "echo '$(date): Deployment failed - health check failed' >> {{ base_path }}/deployment.log"
+
+        - name: Fail the playbook
+          fail:
+            msg: "Deployment failed: health check returned non-zero status"
+      when: healthcheck.rc != 0
