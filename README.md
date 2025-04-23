@@ -42,4 +42,4 @@ Health checks verify the new deployment before switching traffic
 - Access the application at http://localhost:5000 or run the code the same way as it is done in the screenshots
 
 
-**Note**: Screenshots and steps and some other parts are included in the PDF file.
+**Note**: Screenshots, steps and some other parts are included in the PDF file.
