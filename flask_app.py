@@ -20,5 +20,6 @@ def greet():
     name = request.form.get('name')
     return f"Hello, {name}!"
 
+# es dasatestad chavamate axla, araferi shemicvlia proeqtshi
 if __name__ == "__main__":
     app.run()
